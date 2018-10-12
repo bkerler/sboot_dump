@@ -2,6 +2,7 @@
 ## (c) B. Kerler 2018, licensed under MIT License
 
 A tool to dump RAM using S-Boot Upload Mode (in python)
+
 Thx to Nitay Artenstein's code at https://github.com/nitayart/sboot_dump, ported
 to python and added full support based on reversing sboot
   
