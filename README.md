@@ -9,7 +9,9 @@ to python and added full support based on reversing sboot
 Install
 -------
 - Python 3.6 or higher
-- pip install pyusb pyserial
+``
+pip install pyusb pyserial
+``
 
 Run
 ---
