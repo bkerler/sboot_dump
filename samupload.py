@@ -3,6 +3,7 @@
 Licensed under MIT License, (c) B. Kerler
 '''
 import os
+import shutil
 import argparse
 import sys
 import usb.core                 # pyusb
