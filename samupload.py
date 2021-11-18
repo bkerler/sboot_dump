@@ -545,7 +545,10 @@ class samsung_upload():
 
     def probe(self):
         self.cdc.write(b"PrObE\0")
-        data = self.cdc.usbread()
+        if os.name == 'nt':
+            data = self.cdc.usbread(6*self.cdc.EP_IN.wMaxPacketSize)
+        else:
+            data = self.cdc.usbread()
         return self.get_probe_table(data)
 
     def get_probe_table(self, data):
