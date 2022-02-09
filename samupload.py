@@ -8,6 +8,7 @@ import time
 import argparse
 import usb.core  # pyusb
 import usb.util
+from binascii import hexlify
 from struct import unpack, pack, calcsize
 from io import BytesIO
 import logging
@@ -271,10 +272,14 @@ class usb_class():
             rlen = 0xFFFFFFFF
         else:
             rlen = resplen
+
+        if resplen == -1:
+            resplen = self.EP_IN.wMaxPacketSize
+
         while len(res)<rlen:
             try:
-                extend(epr(self.EP_IN.wMaxPacketSize))
-                if len(res)<self.EP_IN.wMaxPacketSize:
+                extend(epr(resplen))
+                if len(res)%self.EP_IN.wMaxPacketSize!=0:
                     break
             except usb.core.USBError as e:
                 error = str(e.strerror)
@@ -509,8 +514,7 @@ class partitiontable():
             self.pend = sh.qword()
         elif mode == 32:
             self.ptype = sh.dword()
-            self.pname = sh.bytes(12).rstrip(b"\x00").decode('utf-8')
-            self.info = sh.dword()
+            self.pname = sh.bytes(16).rstrip(b"\x00").decode('utf-8')
             self.pstart = sh.dword()
             self.pend = sh.dword()
 
@@ -527,7 +531,7 @@ class samsung_upload():
     def connect(self):
         VENDOR_SAMSUNG = 0x04e8
         PRODUCT_MODEM = 0x685d
-        portconfig = [[VENDOR_SAMSUNG, PRODUCT_MODEM, 1]]
+        portconfig = [[VENDOR_SAMSUNG, PRODUCT_MODEM, -1]]
         self.cdc = usb_class(loglevel=logging.INFO,portconfig=portconfig,devclass=10)
         self.cdc.connected = self.cdc.connect()
         if self.cdc.connected:
@@ -549,6 +553,7 @@ class samsung_upload():
             data = self.cdc.usbread(6*self.cdc.EP_IN.wMaxPacketSize)
         else:
             data = self.cdc.usbread()
+        #print(hexlify(data).decode('utf-8'))
         return self.get_probe_table(data)
 
     def get_probe_table(self, data):
@@ -563,22 +568,29 @@ class samsung_upload():
             size = 0x28
             devicename = devicename[1:]
 
-        print(f"\nProbed device:\n" +
-              f"---------------\n" +
-              f"{mode}-Bit, " +
-              f"Devicename: \"{devicename}\"\n")
-
         probetable = []
-        print("Detected upload areas:\n---------------------")
         data.seek(0x10)
         while data.tell() != data.getbuffer().nbytes:
             pt = partitiontable(data.read(size), mode)
             if pt.pstart == 0 and pt.pend == 0:
                 break
+            if pt.pstart < 20:
+                break
             probetable.append(pt)
+            count += 1
+        return mode, devicename, probetable
+
+    def print_probe(self, mode, devicename, probetable):
+        print(f"\nProbed device:\n" +
+              f"---------------\n" +
+              f"{mode}-Bit, " +
+              f"Devicename: \"{devicename}\"\n")
+        print("Detected upload areas:\n---------------------")
+        count = 0
+        for pt in probetable:
             print(f"{count}: {pt}")
             count += 1
-        return probetable
+
 
     def command(self, command, ack=True):
         command += b"\0"
@@ -589,16 +601,12 @@ class samsung_upload():
                 return False
         return True
 
-    def download(self, area):
-        if not "." in area.pname:
-            filename = "%s_%x_%x.lst" % (area.pname, area.pstart, area.pend)
-        else:
-            filename = area.pname
-        wfilename = os.path.join("memory", filename)
-        self.progress.show_progress('File: \"%s\"' % filename, 0, area.pend-area.pstart+1, True)
+    def download_area(self,wfilename,rstart:int, rend:int):
+        filename = os.path.basename(wfilename)
+        self.progress.show_progress('File: \"%s\"' % filename, 0, rend - rstart + 1, True)
         with open(wfilename, "wb") as wf:
-            start = bytes(hex(area.pstart)[2:], 'utf-8')
-            end = bytes(hex(area.pend)[2:], 'utf-8')
+            start = bytes(hex(rstart)[2:], 'utf-8')
+            end = bytes(hex(rend)[2:], 'utf-8')
             if not self.command(b"PrEaMbLe"):
                 return False
             if not self.command(start):
@@ -607,54 +615,89 @@ class samsung_upload():
                 return False
             if not self.command(b"DaTaXfEr", False):
                 return False
-            total = area.pend + 1 - area.pstart
+            total = rend + 1 - rstart
             pos = 0
             while pos < total:
-                self.progress.show_progress('File: \"%s\"' % filename, pos, area.pend - area.pstart+1, True)
+                self.progress.show_progress('File: \"%s\"' % filename, pos, rend - rstart+1, True)
                 size = total - pos
                 if size > 0x80000:
                     size = 0x80000
                 data = self.cdc.usbread(size)
-                self.command(b"AcKnOwLeDgMeNt", False)
-                wf.write(data)
-                pos += len(data)
-            self.progress.show_progress('File: \"%s\"' % filename, area.pend - area.pstart+1, area.pend - area.pstart+1, True)
+                if data != b'':
+                    self.command(b"AcKnOwLeDgMeNt", False)
+                    wf.write(data)
+                    pos += len(data)
+            self.progress.show_progress('File: \"%s\"' % filename, rend - rstart+1, rend - rstart+1, True)
+            data = self.cdc.usbread(64)
+            if data == b'PoStAmBlE\x00':
+                return True
+        return False
+
+    def download(self, area):
+        if not "." in area.pname:
+            filename = "%s_%x_%x.lst" % (area.pname, area.pstart, area.pend)
+        else:
+            filename = area.pname
+        wfilename = os.path.join("memory", filename)
+        if self.download_area(wfilename,area.pstart,area.pend):
+            return True
+        return False
 
 
 def main():
-    parser = argparse.ArgumentParser(description='SUC - Samsung Upload Client (c) B.Kerler 2018-2021.')
+    parser = argparse.ArgumentParser(description='SUC - Samsung Upload Client (c) B.Kerler 2018-2022.')
 
-    print("\nSUC - Samsung Upload Client v1.1 (c) B. Kerler 2018-2021, Email: info @ revskills.de")
-    parser.add_argument(
-        '--area', '-a',
-        help='Select area to dump',
-        default='')
-    parser.add_argument(
-        '--all', '-all',
-        help='Download all areas',
-        action="store_true")
+    print("\nSUC - Samsung Upload Client v1.2 (c) B. Kerler 2018-2022, Email: info @ revskills.de")
+    subparser = parser.add_subparsers(dest="cmd",help="Valid commands are: \nprint, partition, all, range, full")
+
+    print_parser = subparser.add_parser("print", help="Print Memory information")
+
+    partition_parser = subparser.add_parser("partition", help="Download specific memory partition")
+    partition_parser.add_argument('partition', help='Partition number to read')
+
+    all_parser = subparser.add_parser("all", help="Download all memory partitions")
+
+    range_parser = subparser.add_parser("range", help="Download specific range")
+    range_parser.add_argument('start', help='Start offset in hex')
+    range_parser.add_argument('end', help='Start offset in hex')
+
+    full_parser = subparser.add_parser("full", help="Download full memory 1-0xFFFFFFFFFFFFFFF")
+
     args = parser.parse_args()
 
     suc = samsung_upload()
     if suc.connect():
-        areas = suc.probe()
-        if os.path.exists("memory"):
-            shutil.rmtree("memory")
-        os.mkdir("memory")
-
-        if args.area != "":
+        mode, devicename, probetable = suc.probe()
+        cmd = args.cmd
+        if cmd == "print":
+            suc.print_probe(mode,devicename,probetable)
+        elif cmd == "all":
+            if os.path.exists("memory"):
+                shutil.rmtree("memory")
+            os.mkdir("memory")
             print("\nDownloading ....\n-----------------")
-            area = int(args.area)
-            if len(areas) <= area:
-                print("Sorry, but area number is too high")
-                exit(0)
-            suc.download(areas[area])
-            suc.command(b"PoStAmBlE")
-        elif args.all:
-            print("\nDownloading ....\n-----------------")
-            for area in areas:
+            for area in probetable:
                 suc.download(area)
             suc.command(b"PoStAmBlE")
+        elif cmd == "range":
+            start = int(args.start,16)
+            end = int(args.end,16)
+            print("\nDownloading ....\n-----------------")
+            suc.download_area("range.bin",start,end)
+        elif cmd == "full":
+            start = 1
+            end = 0xFFFFFFFFFFFFFFF
+            print("\nDownloading ....\n-----------------")
+            suc.download_area("range.bin",start,end)
+        elif cmd == "partition":
+            if args.partition is not None:
+                print("\nDownloading ....\n-----------------")
+                area = int(args.partition)
+                if len(probetable) <= area:
+                    print("Sorry, but area number is too high")
+                    exit(0)
+                suc.download(probetable[area])
+                suc.command(b"PoStAmBlE")
         else:
             print("\nRun 'samupload.py -all' to dump all areas")
             print("Run 'samupload.py -a [number]' to dump specific area")
