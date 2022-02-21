@@ -1,5 +1,5 @@
 # SUC - Samsung Upload Client v1.0 
-## (c) B. Kerler 2018, licensed under MIT License
+## (c) B. Kerler 2018-2022, licensed under MIT License
 
 A tool to dump RAM using S-Boot Upload Mode (in python)
 
