@@ -87,6 +87,8 @@ class usb_class():
                 self.backend = usb.backend.libusb1.get_backend(find_library=lambda x: "libusb-1.0.dll")
             else:
                 self.backend = usb.backend.libusb1.get_backend(find_library=lambda x: "libusb32-1.0.dll")
+        elif sys.platform.startswith('darwin'):
+            self.backend = usb.backend.libusb1.get_backend(find_library=lambda x: "libusb-1.0.dylib")
         if self.backend is not None:
             try:
                 self.backend.lib.libusb_set_option.argtypes = [c_void_p, c_int]
