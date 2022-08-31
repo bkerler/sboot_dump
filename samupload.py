@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-'''
+"""
 Licensed under MIT License, (c) B. Kerler
-'''
+"""
 import os
 import sys
 import time
 import argparse
 import usb.core  # pyusb
 import usb.util
-from binascii import hexlify
-from struct import unpack, pack, calcsize
+from struct import unpack, calcsize
 from io import BytesIO
 import logging
 import usb.backend.libusb0
@@ -40,11 +39,12 @@ USB_RECIP_RPIPE = 0x05
 
 tag = 0
 
-class usb_class():
 
-    def load_windows_dll(self):
+class usb_class:
+
+    @staticmethod
+    def load_windows_dll():
         if os.name == 'nt':
-            windows_dir = None
             try:
                 # add pygame folder to Windows DLL search paths
                 windows_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)))
@@ -189,17 +189,17 @@ class usb_class():
             if EP_OUT == -1:
                 self.EP_OUT = usb.util.find_descriptor(itf,
                                                        # match the first OUT endpoint
-                                                       custom_match=lambda e: \
-                                                           usb.util.endpoint_direction(e.bEndpointAddress) ==
-                                                           usb.util.ENDPOINT_OUT)
+                                                       custom_match=lambda em: \
+                                                       usb.util.endpoint_direction(em.bEndpointAddress) ==
+                                                       usb.util.ENDPOINT_OUT)
             else:
                 self.EP_OUT = EP_OUT
             if EP_IN == -1:
                 self.EP_IN = usb.util.find_descriptor(itf,
                                                       # match the first OUT endpoint
-                                                      custom_match=lambda e: \
-                                                          usb.util.endpoint_direction(e.bEndpointAddress) ==
-                                                          usb.util.ENDPOINT_IN)
+                                                      custom_match=lambda em: \
+                                                      usb.util.endpoint_direction(em.bEndpointAddress) ==
+                                                      usb.util.ENDPOINT_IN)
             else:
                 self.EP_IN = EP_IN
 
@@ -216,7 +216,6 @@ class usb_class():
                 if reset:
                     self.device.reset()
                 if not self.device.is_kernel_driver_active(self.interface):
-                    # self.device.attach_kernel_driver(self.interface) #Do NOT uncomment
                     self.device.attach_kernel_driver(0)
             except Exception as err:
                 self.debug(str(err))
@@ -237,7 +236,6 @@ class usb_class():
             except usb.core.USBError as err:
                 error = str(err.strerror)
                 if "timeout" in error:
-                    # time.sleep(0.01)
                     try:
                         self.EP_OUT.write(b'')
                     except Exception as err:
@@ -254,34 +252,25 @@ class usb_class():
                     pos += pktsize
                 except Exception as err:
                     self.debug(str(err))
-                    # print("Error while writing")
-                    # time.sleep(0.01)
                     i += 1
                     if i == 3:
                         return False
                     pass
         return True
 
-    def usbread(self, resplen = -1):
+    def usbread(self, resplen=-1):
         res = bytearray()
-        timeout = 0
-        loglevel = self.loglevel
         epr = self.EP_IN.read
-        wMaxPacketSize = self.EP_IN.wMaxPacketSize
         extend = res.extend
-        cond = True
         if resplen == -1:
             rlen = 0xFFFFFFFF
         else:
             rlen = resplen
 
-        if resplen == -1:
-            resplen = self.EP_IN.wMaxPacketSize
-
-        while len(res)<rlen:
+        while len(res) < rlen:
             try:
-                extend(epr(resplen))
-                if len(res)%self.EP_IN.wMaxPacketSize!=0:
+                extend(epr(self.EP_IN.wMaxPacketSize))
+                if len(res) % self.EP_IN.wMaxPacketSize != 0:
                     break
             except usb.core.USBError as e:
                 error = str(e.strerror)
@@ -317,12 +306,10 @@ class usb_class():
         if pktsize is None:
             pktsize = len(data)
         res = self.write(data, pktsize)
-        # port->flush()
         return res
 
     def usbreadwrite(self, data, resplen):
         self.usbwrite(data)  # size
-        # port->flush()
         res = self.usbread(resplen)
         return res
 
@@ -335,19 +322,32 @@ class usb_class():
         return data
 
     def rword(self, count=1, little=False):
-        rev = "<" if little else ">"
+        rev = "little" if little else "big"
         data = []
         for _ in range(count):
             v = self.usbread(2)
             if len(v) == 0:
                 return data
-            data.append(unpack(rev + "H", v)[0])
+            data.append(int.from_bytes(bytes=v,byteorder=rev))
         if count == 1:
             return data[0]
         return data
 
     def rbyte(self, count=1):
         return self.usbread(count)
+
+
+def calcProcessTime(starttime, cur_iter, max_iter):
+    telapsed = time.time() - starttime
+    if telapsed > 0 and cur_iter > 0:
+        testimated = (telapsed / cur_iter) * max_iter
+        finishtime = starttime + testimated
+        finishtime = dt.datetime.fromtimestamp(finishtime).strftime("%H:%M:%S")  # in time
+        lefttime = testimated - telapsed  # in seconds
+        return int(telapsed), int(lefttime), finishtime
+    else:
+        return 0, 0, ""
+
 
 class progress:
     def __init__(self, pagesize):
@@ -357,21 +357,10 @@ class progress:
         self.start = time.time()
         self.pagesize = pagesize
 
-    def calcProcessTime(self, starttime, cur_iter, max_iter):
-        telapsed = time.time() - starttime
-        if telapsed > 0 and cur_iter > 0:
-            testimated = (telapsed / cur_iter) * (max_iter)
-            finishtime = starttime + testimated
-            finishtime = dt.datetime.fromtimestamp(finishtime).strftime("%H:%M:%S")  # in time
-            lefttime = testimated - telapsed  # in seconds
-            return int(telapsed), int(lefttime), finishtime
-        else:
-            return 0, 0, ""
-
     def show_progress(self, prefix, pos, total, display=True):
         if total == 0:
             return
-        prog = round(float(pos) / float(total) * float(100), 1)
+        prog = round(pos / total * 100, 2)
         if prog == 0:
             self.prog = 0
             self.start = time.time()
@@ -379,9 +368,7 @@ class progress:
             self.progpos = pos
             print_progress(prog, 100, prefix='Done',
                            suffix=prefix + ' (Sector 0x%X of 0x%X) %0.2f MB/s' %
-                                  (pos // self.pagesize,
-                                   total // self.pagesize,
-                                   0), bar_length=50)
+                           (pos // self.pagesize, total // self.pagesize, 0), bar_length=50)
 
         if prog > self.prog:
             if display:
@@ -389,42 +376,36 @@ class progress:
                 tdiff = t0 - self.progtime
                 datasize = (pos - self.progpos) / 1024 / 1024
                 if datasize != 0 and tdiff != 0:
-                    try:
-                        throughput = datasize / tdiff
-                    except:
-                        throughput = 0
+                    throughput = datasize / tdiff
                 else:
                     throughput = 0
-                telapsed, lefttime, finishtime = self.calcProcessTime(self.start, prog, 100)
+                telapsed, lefttime, finishtime = calcProcessTime(self.start, prog, 100)
                 hinfo = ""
                 if lefttime > 0:
                     sec = lefttime
                     if sec > 60:
-                        min = sec // 60
+                        rmin = sec // 60
                         sec = sec % 60
-                        if min > 60:
-                            h = min // 24
-                            min = min % 24
-                            hinfo = "%02dh:%02dm:%02ds left" % (h, min, sec)
+                        if rmin > 60:
+                            h = rmin // 24
+                            rmin = rmin % 24
+                            hinfo = "%02dh:%02dm:%02ds left" % (h, rmin, sec)
                         else:
-                            hinfo = "%02dm:%02ds left" % (min, sec)
+                            hinfo = "%02dm:%02ds left" % (rmin, sec)
                     else:
                         hinfo = "%02ds left" % sec
                 if hinfo != "":
                     print_progress(prog, 100, prefix='Progress:',
                                    suffix=prefix + f' (Sector 0x%X of 0x%X, {hinfo}) %0.2f MB/s' %
-                                          (pos // self.pagesize,
-                                           total // self.pagesize,
-                                           throughput), bar_length=50)
+                                   (pos // self.pagesize, total // self.pagesize, throughput), bar_length=50)
                 else:
                     print_progress(prog, 100, prefix='Progress:',
                                    suffix=prefix + f' (Sector 0x%X of 0x%X) %0.2f MB/s' %
-                                          (pos // self.pagesize,
-                                           total // self.pagesize,
-                                           throughput), bar_length=50)
+                                   (pos // self.pagesize, total // self.pagesize, throughput), bar_length=50)
                 self.prog = prog
                 self.progpos = pos
                 self.progtime = t0
+
 
 def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
     """
@@ -442,7 +423,7 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
     str_format = "{0:." + str(decimals) + "f}"
     percents = str_format.format(100 * (iteration / float(total)))
     filled_length = int(round(bar_length * iteration / float(total)))
-    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+    bar = '=' * filled_length + '-' * (bar_length - filled_length)
 
     sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix))
 
@@ -500,7 +481,7 @@ class structhelper_io:
         self.data.seek(pos)
 
 
-class partitiontable():
+class partitiontable:
     ptype = None
     pname = None
     pstart = None
@@ -524,7 +505,48 @@ class partitiontable():
         return f"\"{self.pname}\" ({hex(self.pstart)},{hex(self.pend)})"
 
 
-class samsung_upload():
+def bytetostr(data):
+    return data.rstrip(b"\x00").decode('utf-8')
+
+
+def get_probe_table(data):
+    count = 0
+    devicename = bytetostr(data[0:16])
+    data = BytesIO(data)
+    if devicename[0] != "+":
+        mode = 32
+        size = 0x1C
+    else:
+        mode = 64
+        size = 0x28
+        devicename = devicename[1:]
+
+    probetable = []
+    data.seek(0x10)
+    while data.tell() != data.getbuffer().nbytes:
+        pt = partitiontable(data.read(size), mode)
+        if pt.pstart == 0 and pt.pend == 0:
+            break
+        if pt.pstart < 20:
+            break
+        probetable.append(pt)
+        count += 1
+    return mode, devicename, probetable
+
+
+def print_probe(mode, devicename, probetable):
+    print(f"\nProbed device:\n" +
+          f"---------------\n" +
+          f"{mode}-Bit, " +
+          f"Devicename: \"{devicename}\"\n")
+    print("Detected upload areas:\n---------------------")
+    count = 0
+    for pt in probetable:
+        print(f"{count}: {pt}")
+        count += 1
+
+
+class samsung_upload:
 
     def __init__(self):
         self.cdc = None
@@ -534,7 +556,7 @@ class samsung_upload():
         VENDOR_SAMSUNG = 0x04e8
         PRODUCT_MODEM = 0x685d
         portconfig = [[VENDOR_SAMSUNG, PRODUCT_MODEM, -1]]
-        self.cdc = usb_class(loglevel=logging.INFO,portconfig=portconfig,devclass=10)
+        self.cdc = usb_class(loglevel=logging.INFO, portconfig=portconfig, devclass=10)
         self.cdc.connected = self.cdc.connect()
         if self.cdc.connected:
             self.cdc.write(b"PrEaMbLe\0")
@@ -546,64 +568,21 @@ class samsung_upload():
             return True
         return False
 
-    def bytetostr(self, data):
-        return data.rstrip(b"\x00").decode('utf-8')
-
     def probe(self):
         self.cdc.write(b"PrObE\0")
-        if os.name == 'nt':
-            data = self.cdc.usbread(6*self.cdc.EP_IN.wMaxPacketSize)
-        else:
-            data = self.cdc.usbread()
-        #print(hexlify(data).decode('utf-8'))
-        return self.get_probe_table(data)
-
-    def get_probe_table(self, data):
-        count = 0
-        devicename = self.bytetostr(data[0:16])
-        data = BytesIO(data)
-        if devicename[0] != "+":
-            mode = 32
-            size = 0x1C
-        else:
-            mode = 64
-            size = 0x28
-            devicename = devicename[1:]
-
-        probetable = []
-        data.seek(0x10)
-        while data.tell() != data.getbuffer().nbytes:
-            pt = partitiontable(data.read(size), mode)
-            if pt.pstart == 0 and pt.pend == 0:
-                break
-            if pt.pstart < 20:
-                break
-            probetable.append(pt)
-            count += 1
-        return mode, devicename, probetable
-
-    def print_probe(self, mode, devicename, probetable):
-        print(f"\nProbed device:\n" +
-              f"---------------\n" +
-              f"{mode}-Bit, " +
-              f"Devicename: \"{devicename}\"\n")
-        print("Detected upload areas:\n---------------------")
-        count = 0
-        for pt in probetable:
-            print(f"{count}: {pt}")
-            count += 1
-
+        data = self.cdc.usbread(0x8000)
+        return get_probe_table(data)
 
     def command(self, command, ack=True):
         command += b"\0"
         self.cdc.write(command)
         if ack:
             tmp = self.cdc.usbread(self.cdc.EP_IN.wMaxPacketSize)
-            if tmp not in [b"AcKnOwLeDgMeNt\x00",b"PoStAmBlE\x00"]:
+            if tmp not in [b"AcKnOwLeDgMeNt\x00", b"PoStAmBlE\x00"]:
                 return False
         return True
 
-    def download_area(self,wfilename,rstart:int, rend:int):
+    def download_area(self, wfilename, rstart: int, rend: int):
         filename = os.path.basename(wfilename)
         self.progress.show_progress('File: \"%s\"' % filename, 0, rend - rstart + 1, True)
         with open(wfilename, "wb") as wf:
@@ -620,7 +599,7 @@ class samsung_upload():
             total = rend + 1 - rstart
             pos = 0
             while pos < total:
-                self.progress.show_progress('File: \"%s\"' % filename, pos, rend - rstart+1, True)
+                self.progress.show_progress('File: \"%s\"' % filename, pos, rend - rstart + 1, True)
                 size = total - pos
                 if size > 0x80000:
                     size = 0x80000
@@ -629,19 +608,19 @@ class samsung_upload():
                     self.command(b"AcKnOwLeDgMeNt", False)
                     wf.write(data)
                     pos += len(data)
-            self.progress.show_progress('File: \"%s\"' % filename, rend - rstart+1, rend - rstart+1, True)
+            self.progress.show_progress('File: \"%s\"' % filename, rend - rstart + 1, rend - rstart + 1, True)
             data = self.cdc.usbread(64)
             if data == b'PoStAmBlE\x00':
                 return True
         return False
 
     def download(self, area):
-        if not "." in area.pname:
+        if "." not in area.pname:
             filename = "%s_%x_%x.lst" % (area.pname, area.pstart, area.pend)
         else:
             filename = area.pname
         wfilename = os.path.join("memory", filename)
-        if self.download_area(wfilename,area.pstart,area.pend):
+        if self.download_area(wfilename, area.pstart, area.pend):
             return True
         return False
 
@@ -649,49 +628,70 @@ class samsung_upload():
 def main():
     parser = argparse.ArgumentParser(description='SUC - Samsung Upload Client (c) B.Kerler 2018-2022.')
 
-    print("\nSUC - Samsung Upload Client v1.2 (c) B. Kerler 2018-2022, Email: info @ revskills.de")
-    subparser = parser.add_subparsers(dest="cmd",help="Valid commands are: \nprint, partition, all, range, full")
-
-    print_parser = subparser.add_parser("print", help="Print Memory information")
+    print("\nSUC - Samsung Upload Client v1.3 (c) B. Kerler 2018-2022, Email: info @ revskills.de")
+    subparser = parser.add_subparsers(dest="cmd", help="Valid commands are: \nprint, partition, all, range, full")
 
     partition_parser = subparser.add_parser("partition", help="Download specific memory partition")
     partition_parser.add_argument('partition', help='Partition number to read')
 
-    all_parser = subparser.add_parser("all", help="Download all memory partitions")
+    subparser.add_parser("all", help="Download all memory partitions")
 
     range_parser = subparser.add_parser("range", help="Download specific range")
     range_parser.add_argument('start', help='Start offset in hex')
     range_parser.add_argument('end', help='Start offset in hex')
 
-    full_parser = subparser.add_parser("full", help="Download full memory 1-0xFFFFFFFFFFFFFFF")
+    subparser.add_parser("full", help="Download full memory 1-0xFFFFFFFFFFFFFFF")
+
+    file_parser = subparser.add_parser("file", help="Print partition table from file")
+    file_parser.add_argument('filename', help='Filename to read from')
 
     args = parser.parse_args()
 
     suc = samsung_upload()
-    if suc.connect():
-        mode, devicename, probetable = suc.probe()
-        cmd = args.cmd
-        if cmd == "print":
-            suc.print_probe(mode,devicename,probetable)
-        elif cmd == "all":
+    cmd = args.cmd
+    connected = False
+    mode = ""
+    devicename = ""
+    probetable = None
+    if cmd != "file":
+        if suc.connect():
+            mode, devicename, probetable = suc.probe()
+            connected = True
+
+    if cmd is None:
+        if connected:
+            print_probe(mode, devicename, probetable)
+            print("\nRun 'samupload.py all' to dump all areas")
+            print("Run 'samupload.py partition [number]' to dump specific area")
+            print("Run 'samupload.py range [start_hex] [end_hex]' to dump specific memarea")
+            print("Run 'samupload.py full' to try to bruteforce dump memarea")
+            print("Run 'samupload.py file [filename]' to print the partition table from file")
+    elif cmd == "all":
+        if connected:
             if os.path.exists("memory"):
                 shutil.rmtree("memory")
             os.mkdir("memory")
             print("\nDownloading ....\n-----------------")
             for area in probetable:
                 suc.download(area)
-            suc.command(b"PoStAmBlE")
-        elif cmd == "range":
-            start = int(args.start,16)
-            end = int(args.end,16)
+            suc.command(b"PoStAmBlE", False)
+            print("Done. Dumped memory has been written to memory directory.")
+    elif cmd == "range":
+        if connected:
+            start = int(args.start, 16)
+            end = int(args.end, 16)
             print("\nDownloading ....\n-----------------")
-            suc.download_area("range.bin",start,end)
-        elif cmd == "full":
+            suc.download_area("range.bin", start, end)
+            print("Done. Dumped memory was written to range.bin")
+    elif cmd == "full":
+        if connected:
             start = 1
             end = 0xFFFFFFFFFFFFFFF
             print("\nDownloading ....\n-----------------")
-            suc.download_area("range.bin",start,end)
-        elif cmd == "partition":
+            suc.download_area("range.bin", start, end)
+            print("Done. Dumped memory was written to range.bin")
+    elif cmd == "partition":
+        if connected:
             if args.partition is not None:
                 print("\nDownloading ....\n-----------------")
                 area = int(args.partition)
@@ -700,20 +700,13 @@ def main():
                     exit(0)
                 suc.download(probetable[area])
                 suc.command(b"PoStAmBlE")
-        else:
-            print("\nRun 'samupload.py -all' to dump all areas")
-            print("Run 'samupload.py -a [number]' to dump specific area")
-
-    print("Done. Dumped memory has been written to memory directory.")
-
-
-def test():
-    with open("samsung_dump.bin", "rb") as rf:
-        data = rf.read()
-        suc = samsung_upload()
-        probetable = suc.get_probe_table(data)
+                print("Done. Dumped memory was written the memory directory")
+    elif cmd == "file":
+        with open(args.filename, "rb") as rf:
+            data = rf.read()
+            mode, devicename, probetable = get_probe_table(data)
+            print_probe(mode, devicename, probetable)
 
 
 if __name__ == '__main__':
     main()
-    #test()
