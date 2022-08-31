@@ -7,12 +7,12 @@ Thx to Nitay Artenstein's code at https://github.com/nitayart/sboot_dump, ported
 to python and added full support based on reversing sboot
 
 ### Supported
-- Samsung QC
-- Samsung MTK
-- Samsung Unisoc not yet supported
+- Samsung QC (Tested with S7)
+- Samsung MTK (Tested with A419F)
+- Samsung Unisoc/Spreadtrum (Tested with Galaxy Prime)
 
 ### Install
-- Python 3.6 or higher
+- Python 3.8 or higher
 ``
 pip install pyusb pyserial
 ``

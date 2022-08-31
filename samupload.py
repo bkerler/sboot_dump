@@ -489,6 +489,7 @@ class partitiontable:
 
     def __init__(self, data, mode=64):
         sh = structhelper_io(BytesIO(data))
+        self.mode = mode
         if mode == 64:
             self.ptype = sh.dword()
             self.pname = sh.bytes(12).rstrip(b"\x00").decode('utf-8')
@@ -549,6 +550,7 @@ def print_probe(mode, devicename, probetable):
 class samsung_upload:
 
     def __init__(self):
+        self.mode = 32
         self.cdc = None
         self.progress = progress(512)
 
@@ -586,8 +588,12 @@ class samsung_upload:
         filename = os.path.basename(wfilename)
         self.progress.show_progress('File: \"%s\"' % filename, 0, rend - rstart + 1, True)
         with open(wfilename, "wb") as wf:
-            start = bytes(hex(rstart)[2:], 'utf-8')
-            end = bytes(hex(rend)[2:], 'utf-8')
+            if self.mode == 32:
+                start = bytes("%08x" % rstart, 'utf-8')
+                end = bytes("%08X" % rend, 'utf-8')
+            elif self.mode == 64:
+                start = bytes("%016lx" % rstart, 'utf-8')
+                end = bytes("%016lx" % rend, 'utf-8')
             if not self.command(b"PrEaMbLe"):
                 return False
             if not self.command(start):
