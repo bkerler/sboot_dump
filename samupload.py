@@ -607,8 +607,6 @@ class samsung_upload:
             while pos < total:
                 self.progress.show_progress('File: \"%s\"' % filename, pos, rend - rstart + 1, True)
                 size = total - pos
-                if size > 0x80000:
-                    size = 0x80000
                 data = self.cdc.usbread(size)
                 if data != b'':
                     self.command(b"AcKnOwLeDgMeNt", False)
