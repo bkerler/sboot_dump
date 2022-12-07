@@ -19,31 +19,31 @@ pip install pyusb pyserial
 
 ### Show partition table on the device
 ``
-python3 scripts/samsungupload.py
+python3 samupload.py
 ``
 
 #### For dumping all memory areas:
 
 ``
-python3 scripts/samsungupload.py all
+python3 samupload.py all
 ``
 
 #### For dumping a specfic memory range:
 
 ``
-python3 scripts/samsungupload.py range 0x0 0xffffffff
+python3 samupload.py range 0x0 0xffffffff
 ``
 
 #### For dumping a full memory range:
 
 ``
-python3 scripts/samsungupload.py full
+python3 samupload.py full
 ``
 
 #### For dumping individual areas (Index 0):
 
 ``
-python3 scripts/samsungupload.py partition 0
+python3 samupload.py partition 0
 ``
 
 ### Windows install
@@ -64,7 +64,7 @@ sudo udevadm control -R
 - Log in and out user
 
 ```bash
-sudo pip3 install -r requirements
+sudo pip3 install -r requirements.txt
 ```
 
 Enjoy !
