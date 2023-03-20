@@ -492,13 +492,15 @@ class partitiontable:
         self.mode = mode
         if mode == 64:
             self.ptype = sh.dword()
-            self.pname = sh.bytes(12).rstrip(b"\x00").decode('utf-8')
+            self.pname = sh.bytes(12)
+            self.pname=self.pname[:self.pname.find(b"\x00")].decode('utf-8')
             self.info = sh.qword()
             self.pstart = sh.qword()
             self.pend = sh.qword()
         elif mode == 32:
             self.ptype = sh.dword()
-            self.pname = sh.bytes(16).rstrip(b"\x00").decode('utf-8')
+            self.pname = sh.bytes(16)
+            self.pname = self.pname[:self.pname.find(b"\x00")].decode('utf-8')
             self.pstart = sh.dword()
             self.pend = sh.dword()
 
