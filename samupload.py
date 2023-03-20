@@ -190,16 +190,16 @@ class usb_class:
                 self.EP_OUT = usb.util.find_descriptor(itf,
                                                        # match the first OUT endpoint
                                                        custom_match=lambda em: \
-                                                       usb.util.endpoint_direction(em.bEndpointAddress) ==
-                                                       usb.util.ENDPOINT_OUT)
+                                                           usb.util.endpoint_direction(em.bEndpointAddress) ==
+                                                           usb.util.ENDPOINT_OUT)
             else:
                 self.EP_OUT = EP_OUT
             if EP_IN == -1:
                 self.EP_IN = usb.util.find_descriptor(itf,
                                                       # match the first OUT endpoint
                                                       custom_match=lambda em: \
-                                                      usb.util.endpoint_direction(em.bEndpointAddress) ==
-                                                      usb.util.ENDPOINT_IN)
+                                                          usb.util.endpoint_direction(em.bEndpointAddress) ==
+                                                          usb.util.ENDPOINT_IN)
             else:
                 self.EP_IN = EP_IN
 
@@ -328,7 +328,7 @@ class usb_class:
             v = self.usbread(2)
             if len(v) == 0:
                 return data
-            data.append(int.from_bytes(bytes=v,byteorder=rev))
+            data.append(int.from_bytes(bytes=v, byteorder=rev))
         if count == 1:
             return data[0]
         return data
@@ -368,7 +368,7 @@ class progress:
             self.progpos = pos
             print_progress(prog, 100, prefix='Done',
                            suffix=prefix + ' (Sector 0x%X of 0x%X) %0.2f MB/s' %
-                           (pos // self.pagesize, total // self.pagesize, 0), bar_length=50)
+                                  (pos // self.pagesize, total // self.pagesize, 0), bar_length=50)
 
         if prog > self.prog:
             if display:
@@ -397,11 +397,11 @@ class progress:
                 if hinfo != "":
                     print_progress(prog, 100, prefix='Progress:',
                                    suffix=prefix + f' (Sector 0x%X of 0x%X, {hinfo}) %0.2f MB/s' %
-                                   (pos // self.pagesize, total // self.pagesize, throughput), bar_length=50)
+                                          (pos // self.pagesize, total // self.pagesize, throughput), bar_length=50)
                 else:
                     print_progress(prog, 100, prefix='Progress:',
                                    suffix=prefix + f' (Sector 0x%X of 0x%X) %0.2f MB/s' %
-                                   (pos // self.pagesize, total // self.pagesize, throughput), bar_length=50)
+                                          (pos // self.pagesize, total // self.pagesize, throughput), bar_length=50)
                 self.prog = prog
                 self.progpos = pos
                 self.progtime = t0
@@ -493,7 +493,7 @@ class partitiontable:
         if mode == 64:
             self.ptype = sh.dword()
             self.pname = sh.bytes(12)
-            self.pname=self.pname[:self.pname.find(b"\x00")].decode('utf-8')
+            self.pname = self.pname[:self.pname.find(b"\x00")].decode('utf-8')
             self.info = sh.qword()
             self.pstart = sh.qword()
             self.pend = sh.qword()
