@@ -512,7 +512,7 @@ def bytetostr(data):
 
 def get_probe_table(data):
     count = 0
-    devicename = bytetostr(data[0:16])
+    devicename = bytetostr(data[:data.find(b"\x00")])
     data = BytesIO(data)
     if devicename[0] != "+":
         mode = 32
