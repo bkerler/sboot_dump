@@ -640,7 +640,7 @@ def main():
     parser = argparse.ArgumentParser(description='SUC - Samsung Upload Client (c) B.Kerler 2018-2022.')
 
     print("\nSUC - Samsung Upload Client v1.3 (c) B. Kerler 2018-2022, Email: info @ revskills.de")
-    subparser = parser.add_subparsers(dest="cmd", help="Valid commands are: \nprint, partition, all, range, full")
+    subparser = parser.add_subparsers(dest="cmd")
 
     partition_parser = subparser.add_parser("partition", help="Download specific memory partition")
     partition_parser.add_argument('partition', help='Partition number to read')
