@@ -656,6 +656,8 @@ def main():
     file_parser = subparser.add_parser("file", help="Print partition table from file")
     file_parser.add_argument('filename', help='Filename to read from')
 
+    subparser.add_parser("reboot", help="Reboot the device")
+
     args = parser.parse_args()
 
     suc = samsung_upload()
@@ -677,6 +679,7 @@ def main():
             print("Run 'samupload.py range [start_hex] [end_hex]' to dump specific memarea")
             print("Run 'samupload.py full' to try to bruteforce dump memarea")
             print("Run 'samupload.py file [filename]' to print the partition table from file")
+            print("Run 'samupload.py reboot' to reboot the device")
     elif cmd == "all":
         if connected:
             if os.path.exists("memory"):
@@ -717,6 +720,8 @@ def main():
             data = rf.read()
             mode, devicename, probetable = get_probe_table(data)
             print_probe(mode, devicename, probetable)
+    elif cmd == "reboot":
+        suc.command(b"PoWeRdOwN")
 
 
 if __name__ == '__main__':
