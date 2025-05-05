@@ -640,7 +640,7 @@ def main():
     parser = argparse.ArgumentParser(description='SUC - Samsung Upload Client (c) B.Kerler 2018-2022.')
 
     print("\nSUC - Samsung Upload Client v1.3 (c) B. Kerler 2018-2022, Email: info @ revskills.de")
-    subparser = parser.add_subparsers(dest="cmd", help="Valid commands are: \nprint, partition, all, range, full")
+    subparser = parser.add_subparsers(dest="cmd")
 
     partition_parser = subparser.add_parser("partition", help="Download specific memory partition")
     partition_parser.add_argument('partition', help='Partition number to read')
@@ -655,6 +655,8 @@ def main():
 
     file_parser = subparser.add_parser("file", help="Print partition table from file")
     file_parser.add_argument('filename', help='Filename to read from')
+
+    subparser.add_parser("reboot", help="Reboot the device")
 
     args = parser.parse_args()
 
@@ -677,6 +679,7 @@ def main():
             print("Run 'samupload.py range [start_hex] [end_hex]' to dump specific memarea")
             print("Run 'samupload.py full' to try to bruteforce dump memarea")
             print("Run 'samupload.py file [filename]' to print the partition table from file")
+            print("Run 'samupload.py reboot' to reboot the device")
     elif cmd == "all":
         if connected:
             if os.path.exists("memory"):
@@ -717,6 +720,8 @@ def main():
             data = rf.read()
             mode, devicename, probetable = get_probe_table(data)
             print_probe(mode, devicename, probetable)
+    elif cmd == "reboot":
+        suc.command(b"PoWeRdOwN")
 
 
 if __name__ == '__main__':
