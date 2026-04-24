@@ -570,8 +570,8 @@ class samsung_upload:
         if self.cdc.connected:
             self.cdc.write(b"PrEaMbLe\0")
             data = self.cdc.usbread(self.cdc.EP_IN.wMaxPacketSize)
-            ack = b"AcKnOwLeDgMeNt"
-            if data[:len(ack)] != ack:
+            ack = [b"AcKnOwLeDgMeNt\x00", b"NeGaTiVeAcKmNt\x00"]
+            if data not in ack:
                 print("Sorry, but device isn't in upload mode !")
                 exit(0)
             return True
@@ -587,7 +587,7 @@ class samsung_upload:
         self.cdc.write(command)
         if ack:
             tmp = self.cdc.usbread(self.cdc.EP_IN.wMaxPacketSize)
-            if tmp not in [b"AcKnOwLeDgMeNt\x00", b"PoStAmBlE\x00"]:
+            if tmp not in [b"AcKnOwLeDgMeNt\x00", b"NeGaTiVeAcKmNt\x00", b"PoStAmBlE\x00"]:
                 return False
         return True
 
