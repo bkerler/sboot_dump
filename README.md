@@ -10,6 +10,7 @@ to python and added full support based on reversing sboot
 - Samsung QC (Tested with S7)
 - Samsung MTK (Tested with A419F)
 - Samsung Unisoc/Spreadtrum (Tested with Galaxy Prime)
+- Samsung Exynos (Tested with A546E)
 
 ### Install
 - Python 3.8 or higher
